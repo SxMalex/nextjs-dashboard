@@ -23,7 +23,7 @@ export async function fetchRevenue() {
     console.log('Fetching revenue data...');
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    const data = await sql<Revenue>`SELECT * FROM revenue`;
+    const data = await sql<Revenue>`SELECT * FROM dashboard_revenue`;
 
     console.log('Data fetch completed after 3 seconds.');
 
@@ -39,8 +39,8 @@ export async function fetchLatestInvoices() {
   try {
     const data = await sql<LatestInvoiceRaw>`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
+      FROM dashboard_invoices AS invoices
+      JOIN dashboard_customers AS customers ON invoices.customer_id = customers.id
       ORDER BY invoices.date DESC
       LIMIT 5`;
 
@@ -61,12 +61,12 @@ export async function fetchCardData() {
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
     // how to initialize multiple queries in parallel with JS.
-    const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
-    const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
+    const invoiceCountPromise = sql`SELECT COUNT(*) FROM dashboard_invoices`;
+    const customerCountPromise = sql`SELECT COUNT(*) FROM dashboard_customers`;
     const invoiceStatusPromise = sql`SELECT
          SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
          SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
-         FROM invoices`;
+         FROM dashboard_invoices`;
 
     const data = await Promise.all([
       invoiceCountPromise,
@@ -109,8 +109,8 @@ export async function fetchFilteredInvoices(
         customers.name,
         customers.email,
         customers.image_url
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
+      FROM dashboard_invoices AS invoices
+      JOIN dashboard_customers AS customers ON invoices.customer_id = customers.id
       WHERE
         customers.name ILIKE ${`%${query}%`} OR
         customers.email ILIKE ${`%${query}%`} OR
@@ -132,8 +132,8 @@ export async function fetchInvoicesPages(query: string) {
   noStore();
   try {
     const count = await sql`SELECT COUNT(*)
-    FROM invoices
-    JOIN customers ON invoices.customer_id = customers.id
+    FROM dashboard_invoices AS invoices
+    JOIN dashboard_customers AS customers ON invoices.customer_id = customers.id
     WHERE
       customers.name ILIKE ${`%${query}%`} OR
       customers.email ILIKE ${`%${query}%`} OR
@@ -159,7 +159,7 @@ export async function fetchInvoiceById(id: string) {
         invoices.customer_id,
         invoices.amount,
         invoices.status
-      FROM invoices
+      FROM dashboard_invoices AS invoices
       WHERE invoices.id = ${id};
     `;
 
@@ -168,7 +168,6 @@ export async function fetchInvoiceById(id: string) {
       // Convert amount from cents to dollars
       amount: invoice.amount / 100,
     }));
-    console.log(invoice);
     return invoice[0];
   } catch (error) {
     console.error('Database Error:', error);
@@ -183,7 +182,7 @@ export async function fetchCustomers() {
       SELECT
         id,
         name
-      FROM customers
+      FROM dashboard_customers
       ORDER BY name ASC
     `;
 
@@ -207,8 +206,8 @@ export async function fetchFilteredCustomers(query: string) {
 		  COUNT(invoices.id) AS total_invoices,
 		  SUM(CASE WHEN invoices.status = 'pending' THEN invoices.amount ELSE 0 END) AS total_pending,
 		  SUM(CASE WHEN invoices.status = 'paid' THEN invoices.amount ELSE 0 END) AS total_paid
-		FROM customers
-		LEFT JOIN invoices ON customers.id = invoices.customer_id
+		FROM dashboard_customers AS customers
+		LEFT JOIN dashboard_invoices AS invoices ON customers.id = invoices.customer_id
 		WHERE
 		  customers.name ILIKE ${`%${query}%`} OR
         customers.email ILIKE ${`%${query}%`}
@@ -232,7 +231,7 @@ export async function fetchFilteredCustomers(query: string) {
 export async function getUser(email: string) {
   noStore();
   try {
-    const user = await sql`SELECT * FROM users WHERE email=${email}`;
+    const user = await sql`SELECT * FROM dashboard_users WHERE email=${email}`;
     return user.rows[0] as User;
   } catch (error) {
     console.error('Failed to fetch user:', error);
